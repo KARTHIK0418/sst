@@ -151,6 +151,7 @@ test("constructor: props disabling live development ", async () => {
           SST_DEBUG_SRC_HANDLER: "test/lambda.handler",
           SST_DEBUG_ENDPOINT: "placeholder",
           SST_DEBUG_BUCKET_NAME: "placeholder",
+          NODE_OPTIONS: "--enable-source-maps",
           AWS_NODEJS_CONNECTION_REUSE_ENABLED: "1",
         },
       },
@@ -178,6 +179,7 @@ test("constructor: liveDev prop defaults to true", async () => {
           SST_DEBUG_SRC_HANDLER: "test/lambda.handler",
           SST_DEBUG_ENDPOINT: "placeholder",
           SST_DEBUG_BUCKET_NAME: "placeholder",
+          NODE_OPTIONS: "--enable-source-maps",
           AWS_NODEJS_CONNECTION_REUSE_ENABLED: "1",
         },
       },
@@ -311,6 +313,87 @@ test("runtime-class-invalid", async () => {
       runtime: lambda.Runtime.JAVA_11,
     });
   }).toThrow(/The specified runtime is not supported/);
+});
+
+test("environment-enable-source-maps-add-env-var", async () => {
+  const stack = new Stack(new App(), "stack");
+  new Function(stack, "Function", {
+    handler: "test/lambda.handler",
+    runtime: lambda.Runtime.NODEJS_10_X,
+  });
+  expectCdk(stack).to(
+    haveResource("AWS::Lambda::Function", {
+      Environment: {
+        Variables: {
+          NODE_OPTIONS: "--enable-source-maps",
+          AWS_NODEJS_CONNECTION_REUSE_ENABLED: "1",
+        }
+      }
+    })
+  );
+});
+
+test("environment-enable-source-maps-append-default", async () => {
+  const stack = new Stack(new App(), "stack");
+  stack.setDefaultFunctionProps({
+    environment: {
+      NODE_OPTIONS: "--flag --key=value",
+    }
+  })
+  new Function(stack, "Function", {
+    handler: "test/lambda.handler",
+    runtime: lambda.Runtime.NODEJS_10_X,
+  });
+  expectCdk(stack).to(
+    haveResource("AWS::Lambda::Function", {
+      Environment: {
+        Variables: {
+          NODE_OPTIONS: "--flag --key=value --enable-source-maps",
+          AWS_NODEJS_CONNECTION_REUSE_ENABLED: "1",
+        }
+      }
+    })
+  );
+});
+
+test("environment-enable-source-maps-append-prop", async () => {
+  const stack = new Stack(new App(), "stack");
+  new Function(stack, "Function", {
+    handler: "test/lambda.handler",
+    runtime: lambda.Runtime.NODEJS_10_X,
+    environment: {
+      NODE_OPTIONS: "--flag --key=value",
+    }
+  });
+  expectCdk(stack).to(
+    haveResource("AWS::Lambda::Function", {
+      Environment: {
+        Variables: {
+          NODE_OPTIONS: "--flag --key=value --enable-source-maps",
+          AWS_NODEJS_CONNECTION_REUSE_ENABLED: "1",
+        }
+      }
+    })
+  );
+});
+
+test("environment-enable-source-maps-append-dynamic", async () => {
+  const stack = new Stack(new App(), "stack");
+  const foo = new Function(stack, "Function", {
+    handler: "test/lambda.handler",
+    runtime: lambda.Runtime.NODEJS_10_X,
+  });
+  foo.addEnvironment("NODE_OPTIONS", "--flag --key=value")
+  expectCdk(stack).to(
+    haveResource("AWS::Lambda::Function", {
+      Environment: {
+        Variables: {
+          NODE_OPTIONS: "--flag --key=value --enable-source-maps",
+          AWS_NODEJS_CONNECTION_REUSE_ENABLED: "1",
+        }
+      }
+    })
+  );
 });
 
 test("timeout-number", async () => {
@@ -1470,6 +1553,7 @@ test("Stack.defaultFunctionProps(): env", async () => {
         Variables: {
           keyA: "valueA",
           keyB: "valueB",
+          NODE_OPTIONS: "--enable-source-maps",
           AWS_NODEJS_CONNECTION_REUSE_ENABLED: "1",
         },
       },
@@ -1545,6 +1629,7 @@ test("App.defaultFunctionProps(): calledTwice", async () => {
         Variables: {
           keyA: "valueA",
           keyB: "valueB",
+          NODE_OPTIONS: "--enable-source-maps",
           AWS_NODEJS_CONNECTION_REUSE_ENABLED: "1",
         },
       },
@@ -1593,6 +1678,7 @@ test("App.defaultFunctionProps(): env", async () => {
         Variables: {
           keyA: "valueA",
           keyB: "valueB",
+          NODE_OPTIONS: "--enable-source-maps",
           AWS_NODEJS_CONNECTION_REUSE_ENABLED: "1",
         },
       },
@@ -1670,6 +1756,7 @@ test("App.defaultFunctionProps(): callback-calledTwice", async () => {
         Variables: {
           keyA: "valueA",
           keyB: "valueB",
+          NODE_OPTIONS: "--enable-source-maps",
           AWS_NODEJS_CONNECTION_REUSE_ENABLED: "1",
         },
       },
@@ -1701,6 +1788,7 @@ test("App.defaultFunctionProps(): override", async () => {
         Variables: {
           keyA: "valueA",
           keyB: "valueB",
+          NODE_OPTIONS: "--enable-source-maps",
           AWS_NODEJS_CONNECTION_REUSE_ENABLED: "1",
         },
       },
@@ -1811,6 +1899,7 @@ test("fromDefinition-props-inherit", async () => {
         Variables: {
           KEY_A: "a",
           KEY_B: "b",
+          NODE_OPTIONS: "--enable-source-maps",
           AWS_NODEJS_CONNECTION_REUSE_ENABLED: "1",
         },
       },
@@ -1852,6 +1941,7 @@ test("fromDefinition-props-inherit-with-app-defaultFunctionProps", async () => {
           KEY_A: "a",
           KEY_B: "b",
           KEY_C: "c",
+          NODE_OPTIONS: "--enable-source-maps",
           AWS_NODEJS_CONNECTION_REUSE_ENABLED: "1",
         },
       },

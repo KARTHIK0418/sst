@@ -376,6 +376,10 @@ export class Function extends lambda.Function {
 
     // Enable reusing connections with Keep-Alive for NodeJs Lambda function
     if (isNodeRuntime) {
+      // Enable source maps by default.
+      if (props.environment?.NODE_OPTIONS == null) {
+        this.addEnvironment("NODE_OPTIONS", "--enable-source-maps");
+      }
       this.addEnvironment("AWS_NODEJS_CONNECTION_REUSE_ENABLED", "1", {
         removeInEdge: true,
       });
@@ -401,6 +405,16 @@ export class Function extends lambda.Function {
     if (this.role) {
       attachPermissionsToRole(this.role as iam.Role, permissions);
     }
+  }
+
+  public addEnvironment(key: string, value: string, options?: lambda.EnvironmentOptions): this {
+    // Append user-defined NODE_OPTIONS if exists.
+    if (key === "NODE_OPTIONS") {
+      if (!value.includes("--enable-source-maps")) {
+        value = [value, "--enable-source-maps"].join(" ").trim();
+      }
+    }
+    return super.addEnvironment(key, value, options);
   }
 
   static normalizeSrcPath(srcPath: string): string {
