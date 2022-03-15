@@ -1,6 +1,6 @@
 import * as path from "path";
 import * as fs from "fs-extra";
-import { Construct } from 'constructs';
+import { Construct } from "constructs";
 
 import {
   StaticSite,
@@ -31,7 +31,9 @@ export class ViteStaticSite extends StaticSite {
     }
 
     // create types file
-    const filePath = path.resolve(path.join(sitePath, typesPath || "src/sst-env.d.ts"));
+    const filePath = path.resolve(
+      path.join(sitePath, typesPath || "src/sst-env.d.ts")
+    );
     generateTypesFile(filePath, environment);
 
     super(scope, id, {
@@ -56,12 +58,16 @@ export class ViteStaticSite extends StaticSite {
   }
 }
 
-function generateTypesFile(typesFullPath: string, environment?: { [key: string]: string }) {
-  const content =
-`/// <reference types="vite/client" />
+function generateTypesFile(
+  typesFullPath: string,
+  environment?: { [key: string]: string }
+) {
+  const content = `/// <reference types="vite/client" />
 
 interface ImportMetaEnv {
-${Object.keys(environment || {}).map(key => `  readonly ${key}: string`).join("\n")}
+${Object.keys(environment || {})
+  .map((key) => `  readonly ${key}: string`)
+  .join("\n")}
 }
 
 interface ImportMeta {

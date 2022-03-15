@@ -12,7 +12,7 @@ Install the example.
 $ npm init serverless-stack --example planetscale
 # Or with Yarn
 $ yarn create serverless-stack --example planetscale
-``` 
+```
 
 ## Commands
 

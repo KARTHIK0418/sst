@@ -206,15 +206,17 @@ async function applyConfig(argv) {
 
 async function loadAwsCredentials(script) {
   if (process.env.__TEST__ === "true") return;
-  if (![
-    cmd.diff,
-    cmd.build,
-    cmd.deploy,
-    cmd.remove,
-    cmd.start,
-    cmd.console,
-    cmd.cdk,
-  ].includes(script)) {
+  if (
+    ![
+      cmd.diff,
+      cmd.build,
+      cmd.deploy,
+      cmd.remove,
+      cmd.start,
+      cmd.console,
+      cmd.cdk,
+    ].includes(script)
+  ) {
     return;
   }
 

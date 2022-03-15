@@ -115,9 +115,13 @@ export function cleanupLogGroupName(str: string): string {
   return str.replace(/[^.\-_/#A-Za-z0-9]/g, "");
 }
 
-function buildLogGroupRetention(accessLog?: boolean | string | AccessLogProps ): logs.RetentionDays {
-  const retention = (accessLog && (accessLog as AccessLogProps).retention);
-  if (!retention) { return logs.RetentionDays.INFINITE; }
+function buildLogGroupRetention(
+  accessLog?: boolean | string | AccessLogProps
+): logs.RetentionDays {
+  const retention = accessLog && (accessLog as AccessLogProps).retention;
+  if (!retention) {
+    return logs.RetentionDays.INFINITE;
+  }
 
   // Case: retention is string
   if (typeof retention === "string") {

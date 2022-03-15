@@ -944,26 +944,26 @@ test("attachPermissions: array: sst RDS", async () => {
               [
                 "arn:",
                 {
-                  "Ref": "AWS::Partition"
+                  Ref: "AWS::Partition",
                 },
                 ":rds:us-east-1:my-account:cluster:",
                 {
-                  "Ref": "clusterCluster4486A143"
-                }
-              ]
-            ]
-          }
+                  Ref: "clusterCluster4486A143",
+                },
+              ],
+            ],
+          },
         },
         {
           Action: [
             "secretsmanager:GetSecretValue",
-            "secretsmanager:DescribeSecret"
+            "secretsmanager:DescribeSecret",
           ],
           Effect: "Allow",
           Resource: {
-            Ref: "clusterClusterSecretAttachment92A36E7C"
-          }
-        }
+            Ref: "clusterClusterSecretAttachment92A36E7C",
+          },
+        },
       ],
       Version: "2012-10-17",
     },

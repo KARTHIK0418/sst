@@ -17,8 +17,8 @@ export class MainStack extends sst.Stack {
           SITE_URL: Lazy.stringValue({
             produce() {
               return site.url;
-            }
-          })
+            },
+          }),
         },
       },
       routes: {
@@ -44,8 +44,8 @@ export class MainStack extends sst.Stack {
             IDENTITY_POOL_ID: Lazy.stringValue({
               produce() {
                 return auth.cognitoUserPool.userPoolId;
-              }
-            })
+              },
+            }),
           },
         },
         triggers: {

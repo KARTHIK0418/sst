@@ -368,7 +368,9 @@ export class Auth extends Construct implements SSTConstruct {
   private addTriggers(cognitoProps: AuthCognitoProps): void {
     const { triggers, defaultFunctionProps } = cognitoProps;
 
-    if (!triggers || Object.keys(triggers).length === 0) { return; }
+    if (!triggers || Object.keys(triggers).length === 0) {
+      return;
+    }
 
     // Validate cognito user pool is not imported
     // ie. imported IUserPool does not have the "addTrigger" function

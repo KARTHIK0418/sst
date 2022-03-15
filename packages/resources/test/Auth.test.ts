@@ -54,11 +54,11 @@ test("cognito-true", async () => {
             "",
             [
               "cognito-idp.us-east-1.",
-              { "Ref": "AWS::URLSuffix" },
+              { Ref: "AWS::URLSuffix" },
               "/",
-              { "Ref": "AuthUserPool8115E87F" }
-            ]
-          ]
+              { Ref: "AuthUserPool8115E87F" },
+            ],
+          ],
         },
       },
     ],
@@ -218,10 +218,10 @@ test("cognito: userPool is imported by userPoolName", async () => {
             "",
             [
               "cognito-idp.us-east-1.",
-              { "Ref": "AWS::URLSuffix" },
-              "/my-user-pool"
-            ]
-          ]
+              { Ref: "AWS::URLSuffix" },
+              "/my-user-pool",
+            ],
+          ],
         },
       },
     ],
@@ -234,7 +234,11 @@ test("cognito: userPool is imported by userPoolName with triggers", async () => 
   expect(() => {
     new Auth(stack, "Auth", {
       cognito: {
-        userPool: cognito.UserPool.fromUserPoolId(stack, "IPool", "my-user-pool"),
+        userPool: cognito.UserPool.fromUserPoolId(
+          stack,
+          "IPool",
+          "my-user-pool"
+        ),
         triggers: {
           createAuthChallenge: "test/lambda.handler",
         },
@@ -554,11 +558,11 @@ test("cognito-and-social", async () => {
             "",
             [
               "cognito-idp.us-east-1.",
-              { "Ref": "AWS::URLSuffix" },
+              { Ref: "AWS::URLSuffix" },
               "/",
-              { "Ref": "AuthUserPool8115E87F" }
-            ]
-          ]
+              { Ref: "AuthUserPool8115E87F" },
+            ],
+          ],
         },
       },
     ],

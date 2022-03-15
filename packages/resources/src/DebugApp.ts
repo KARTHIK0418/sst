@@ -38,15 +38,17 @@ export class DebugApp extends cdk.App {
 
   synth(options: cdk.StageSynthesisOptions = {}): cxapi.CloudAssembly {
     // Check app has stack
-    const stacks = this.node.children.filter((child) =>
-      isSSTDebugStack(child)
-    );
+    const stacks = this.node.children.filter((child) => isSSTDebugStack(child));
     if (stacks.length > 1) {
-      console.error(`Error: You can only create 1 DebugStack inside the "debugApp()" callback.\n`);
+      console.error(
+        `Error: You can only create 1 DebugStack inside the "debugApp()" callback.\n`
+      );
       process.exit(1);
     }
     if (stacks.length === 0) {
-      console.error(`Error: The "debugApp()" callback is not creating a DebugStack.\n`);
+      console.error(
+        `Error: The "debugApp()" callback is not creating a DebugStack.\n`
+      );
       process.exit(1);
     }
 
