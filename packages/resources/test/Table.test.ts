@@ -347,6 +347,19 @@ test("constructor: fields-dynamodbTable-props-with-sortKey-error", async () => {
   }).toThrow(/Cannot configure the "dynamodbTableProps.sortKey"/);
 });
 
+test("constructor: fields-dynamodbTable-props-with-stream-error", async () => {
+  const stack = new Stack(new App(), "stack");
+  expect(() => {
+    new Table(stack, "Table", {
+      ...baseTableProps,
+      dynamodbTable: {
+        stream: dynamodb.StreamViewType.NEW_IMAGE,
+      } as dynamodb.TableProps,
+      stream: true,
+    });
+  }).toThrow(/Cannot configure the "dynamodbTableProps.stream"/);
+});
+
 test("globalIndexes-options", async () => {
   const stack = new Stack(new App(), "stack");
   new Table(stack, "Table", {
@@ -828,24 +841,6 @@ test("consumers: error-stream-false", async () => {
     });
   }).toThrow(
     /Please enable the "stream" option to add consumers to the "Table" Table/
-  );
-});
-
-test("consumers: error-stream-redefined", async () => {
-  const stack = new Stack(new App(), "stack");
-  expect(() => {
-    new Table(stack, "Table", {
-      ...baseTableProps,
-      dynamodbTable: {
-        stream: dynamodb.StreamViewType.NEW_IMAGE,
-      },
-      stream: true,
-      consumers: {
-        Consumer_0: "test/lambda.handler",
-      },
-    });
-  }).toThrow(
-    /Cannot configure the "dynamodbTableProps.stream" in the "Table" Table/
   );
 });
 

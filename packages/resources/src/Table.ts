@@ -63,7 +63,7 @@ export type TableIndexProps = TableGlobalIndexProps;
 
 export type TableCdkProps = Omit<
   dynamodb.TableProps,
-  "partitionKey" | "sortKey"
+  "partitionKey" | "sortKey" | "stream"
 >;
 
 export type TableCdkIndexProps = Omit<
