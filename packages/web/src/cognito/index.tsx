@@ -14,104 +14,70 @@ import {
   ISignUpResult,
 } from "amazon-cognito-identity-js";
 
-const CognitoContext = createContext<{ cognito: Cognito }>(undefined as any);
+const Context = createContext<{ cognito: Cognito }>(undefined as any);
 
-export function CognitoProvider(props: PropsWithChildren<{ value: Cognito }>) {
+export function Provider(props: PropsWithChildren<{ value: Cognito }>) {
   const [auth, setAuth] = useState({ cognito: props.value });
 
   useEffect(() => {
-    props.value.onChange((cognito) =>
-      setAuth({
-        cognito,
-      })
-    );
+    props.value.onChange(() => setAuth({ cognito: props.value }));
     props.value.init()?.catch();
   }, []);
 
-  return (
-    <CognitoContext.Provider value={auth}>
-      {props.children}
-    </CognitoContext.Provider>
-  );
+  return <Context.Provider value={auth}>{props.children}</Context.Provider>;
 }
 
-type CognitoOpts = {
+type Opts = {
   UserPoolId: string;
   ClientId: string;
 };
 
-export class Cognito {
-  public readonly pool: CognitoUserPool;
-  private callbacks: ((cognito: Cognito) => void)[] = [];
+type Cognito = ReturnType<typeof create>;
 
-  private _session?: CognitoUserSession;
-  private _isInitializing = true;
+export function create(opts: Opts) {
+  const pool = new CognitoUserPool({
+    UserPoolId: opts.UserPoolId,
+    ClientId: opts.ClientId,
+  });
 
-  public get isInitializing() {
-    return this._isInitializing;
-  }
+  const state = {
+    isInitializing: true,
+    session: undefined as CognitoUserSession | undefined,
+    get user() {
+      return pool.getCurrentUser();
+    },
+  };
+  const callbacks: ((s: typeof state) => void)[] = [];
 
-  private set isInitializing(val: boolean) {
-    this._isInitializing = val;
-    this.trigger();
-  }
-
-  get session() {
-    return this._session;
-  }
-
-  private set session(session: CognitoUserSession | undefined) {
-    this._session = session;
-    this.trigger();
-  }
-
-  get user() {
-    return this.pool.getCurrentUser();
-  }
-
-  constructor(opts: CognitoOpts) {
-    this.pool = new CognitoUserPool({
-      UserPoolId: opts.UserPoolId,
-      ClientId: opts.ClientId,
-    });
-  }
-
-  public onChange(cb: (cognito: Cognito) => void) {
-    this.callbacks.push(cb);
-  }
-
-  private trigger() {
-    for (let cb of this.callbacks) {
-      cb(this);
-    }
-  }
-
-  public init() {
-    if (!this.user) {
-      this.isInitializing = false;
+  function init() {
+    if (!state.user) {
+      state.isInitializing = false;
+      trigger();
       return Promise.resolve(undefined);
     }
     return new Promise<CognitoUserSession | undefined>((resolve) => {
-      this.user!.getSession(
+      state.user!.getSession(
         (err: Error | null, session: CognitoUserSession) => {
           if (err) {
-            this.user!.signOut();
+            state.user!.signOut();
             resolve(undefined);
-            this.isInitializing = false;
+            state.isInitializing = false;
+            trigger();
             return;
           }
-          this.session = session;
+          state.session = session;
           resolve(session);
-          this.isInitializing = false;
+          state.isInitializing = false;
+          trigger();
         }
       );
     });
   }
 
-  public async login(email: string, password: string) {
+  async function login(email: string, password: string) {
     const user = new CognitoUser({
       Username: email,
-      Pool: this.pool,
+      Pool: pool,
     });
 
     const authDetails = new AuthenticationDetails({
@@ -122,8 +88,8 @@ export class Cognito {
     return new Promise((resolve, reject) => {
       user.authenticateUser(authDetails, {
         onSuccess: (result) => {
-          this.session = result;
-          this.trigger();
+          state.session = result;
+          trigger();
           resolve(result);
         },
         onFailure: (err) => {
@@ -133,13 +99,13 @@ export class Cognito {
     });
   }
 
-  public async register(
+  async function register(
     email: string,
     password: string,
     attributes: CognitoUserAttribute[] = []
   ) {
     return new Promise<ISignUpResult>((resolve, reject) => {
-      this.pool.signUp(
+      pool.signUp(
         email,
         password,
         [
@@ -155,17 +121,17 @@ export class Cognito {
             reject(err);
             return;
           }
-          this.trigger();
+          trigger();
           resolve(resp!);
         }
       );
     });
   }
 
-  public async confirm(username: string, code: string) {
+  async function confirm(username: string, code: string) {
     const user = new CognitoUser({
       Username: username,
-      Pool: this.pool,
+      Pool: pool,
     });
     return new Promise((resolve, reject) => {
       user.confirmRegistration(code, true, (err, result) => {
@@ -178,10 +144,10 @@ export class Cognito {
     });
   }
 
-  public async resend(username: string) {
+  async function resend(username: string) {
     const user = new CognitoUser({
       Username: username,
-      Pool: this.pool,
+      Pool: pool,
     });
     return new Promise((resolve, reject) => {
       user.resendConfirmationCode((err, result) => {
@@ -193,9 +159,29 @@ export class Cognito {
       });
     });
   }
+
+  function onChange(cb: (opts: typeof state) => void) {
+    callbacks.push(cb);
+  }
+
+  function trigger() {
+    for (const cb of callbacks) {
+      cb(state);
+    }
+  }
+
+  return {
+    state,
+    init,
+    login,
+    onChange,
+    register,
+    confirm,
+    resend,
+  };
 }
 
-export function useCognito() {
-  const auth = useContext(CognitoContext);
+export function use() {
+  const auth = useContext(Context);
   return auth.cognito;
 }
