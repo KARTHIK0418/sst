@@ -1013,7 +1013,10 @@ export class AppSyncApi extends Construct implements SSTConstruct {
   }
 
   private isDataSourceResolverProps(object: AppSyncApiResolverProps): boolean {
-    return object.dataSource !== undefined;
+    return (
+      object.dataSource !== undefined ||
+      object.resolverProps?.pipelineConfig !== undefined
+    );
   }
 
   private normalizeResolverKey(resolverKey: string): string {
