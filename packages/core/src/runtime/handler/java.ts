@@ -36,8 +36,9 @@ export const JavaHandler: Definition<Bundle> = opts => {
     args: [
       buildTask,
       `-Dorg.gradle.project.buildDir=${target}`,
-      `-Dorg.gradle.logging.level=${process.env.DEBUG ? "debug" : "lifecycle"}`,
+      ...(process.env.GRADLE_LOGGING_LEVEL ? [`-Dorg.gradle.logging.level=${process.env.GRADLE_LOGGING_LEVEL}`] : []),
     ],
+
     env: {},
   };
 
@@ -109,6 +110,7 @@ export const JavaHandler: Definition<Bundle> = opts => {
     watcher: {
       include: [
         path.join(opts.srcPath, "**/*.java"),
+        path.join(opts.srcPath, "**/*.kt"),
         path.join(opts.srcPath, "**/*.gradle"),
       ],
       ignore: [],
