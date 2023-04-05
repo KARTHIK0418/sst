@@ -172,6 +172,7 @@ module.exports = {
         "constructs/RemixSite",
         "constructs/AstroSite",
         "constructs/SolidStartSite",
+        "constructs/ViteSsrSite",
       ],
       Database: ["constructs/RDS", "constructs/Table"],
       Api: [

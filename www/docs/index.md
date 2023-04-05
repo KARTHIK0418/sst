@@ -58,6 +58,12 @@ import useBaseUrl from "@docusaurus/useBaseUrl";
     </a>
   </li>
   <li>
+    <a href={useBaseUrl("/constructs/ViteSsrSite")}>
+      <h3>Vite SSR</h3>
+      <p>Deploy an Vite SSR app to your AWS account.</p>
+    </a>
+  </li>
+  <li>
     <a href={useBaseUrl("/constructs/StaticSite")}>
       <h3><img src="/img/logos/html.svg" />Static sites</h3>
       <p>Create and deploy a serverless static site to AWS with SST.</p>
