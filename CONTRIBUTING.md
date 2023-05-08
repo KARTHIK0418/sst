@@ -100,10 +100,10 @@ $ yarn test <path_to_the_test_for_the_construct>
 
 ### CLI
 
-If you are working on the `packages/cli` just go ahead and make your changes. Then run your tests.
+If you are working on the `packages/sst` just go ahead and make your changes. Then run your tests.
 
 ```bash
-$ cd packages/cli
+$ cd packages/sst
 $ yarn test
 ```
 
@@ -120,6 +120,25 @@ To run the docs site.
 ```bash
 $ cd www
 $ yarn start
+```
+
+### Examples
+
+Example projects should be added in the `packages/create-sst` folder. Create a new folder in the `packages/create-sst/bin/presets` folder and then add the files for the example project you want to add. Your example can take advantage of other presets by specifying the extension in a `preset.mjs` file. 
+
+You can test your example by running the following command:
+
+```bash
+$ cd packages/create-sst
+$ yarn install
+$ node .bin/create-sst.mjs --template=examples/folder-name-for-your-new-example MyExampleApp
+```
+
+Alternatively if you do not want to type `node .bin/create-sst.mjs` every time you can run `npm link` after which you can run instead:
+
+```bash
+$ cd packages/create-sst
+$ create-sst --template=examples/folder-name-for-your-new-example MyExampleApp
 ```
 
 ## Pull Requests
