@@ -47,6 +47,7 @@ import {
 import { Asset } from "aws-cdk-lib/aws-s3-assets";
 import {
   Distribution,
+  IDistribution,
   ICachePolicy,
   IResponseHeadersPolicy,
   BehaviorOptions,
@@ -109,6 +110,11 @@ export type SsrBuildConfig = {
   prerenderedBuildS3KeyPrefix?: string;
 };
 
+export interface SsrCachePolicyProps {
+  cookies?: string[];
+  headers?: string[];
+  query?: string[];
+}
 export interface SsrSiteNodeJSProps extends NodeJSProps {}
 export interface SsrDomainProps extends BaseSiteDomainProps {}
 export interface SsrSiteFileOptions extends BaseSiteFileOptions {}
@@ -259,7 +265,7 @@ export interface SsrSiteProps {
      * Pass in a value to override the default settings this construct uses to
      * create the CDK `Distribution` internally.
      */
-    distribution?: SsrCdkDistributionProps;
+    distribution?: IDistribution | SsrCdkDistributionProps;
     /**
      * Override the CloudFront cache policy properties for responses from the
      * server rendering Lambda.
@@ -267,7 +273,7 @@ export interface SsrSiteProps {
      * @note The default cache policy that is used in the abscene of this property
      * is one that performs no caching of the server response.
      */
-    serverCachePolicy?: ICachePolicy;
+    serverCachePolicy?: ICachePolicy | SsrCachePolicyProps;
     /**
      * Override the CloudFront response headers policy properties for responses
      * from the server rendering Lambda.
@@ -435,9 +441,7 @@ export abstract class SsrSite extends Construct implements SSTConstruct {
     this.validateCloudFrontDistributionSettings();
     this.s3Origin = this.createCloudFrontS3Origin();
     this.cfFunction = this.createCloudFrontFunction();
-    this.distribution = this.props.edge
-      ? this.createCloudFrontDistributionForEdge()
-      : this.createCloudFrontDistributionForRegional();
+    this.distribution = this.createCloudFrontDistribution();
     this.grantServerCloudFrontPermissions();
 
     // Connect Custom Domain to CloudFront Distribution
@@ -948,12 +952,16 @@ export abstract class SsrSite extends Construct implements SSTConstruct {
 
   private validateCloudFrontDistributionSettings() {
     const { cdk } = this.props;
-    if (cdk?.distribution?.certificate) {
+    if (this.getImportedCloudFrontDistribution(cdk?.distribution)) {
+      return;
+    }
+    const distribution = (cdk?.distribution || {}) as SsrCdkDistributionProps;
+    if (distribution?.certificate) {
       throw new Error(
         `Do not configure the "cfDistribution.certificate". Use the "customDomain" to configure the domain certificate.`
       );
     }
-    if (cdk?.distribution?.domainNames) {
+    if (distribution?.domainNames) {
       throw new Error(
         `Do not configure the "cfDistribution.domainNames". Use the "customDomain" to configure the domain name.`
       );
@@ -978,30 +986,25 @@ function handler(event) {
     });
   }
 
-  protected createCloudFrontDistributionForRegional(): Distribution {
-    const { cdk } = this.props;
-    const cfDistributionProps = cdk?.distribution || {};
-    const cachePolicy = cdk?.serverCachePolicy ?? this.buildServerCachePolicy();
-
-    return new Distribution(this, "Distribution", {
-      // these values can be overwritten by cfDistributionProps
-      defaultRootObject: "",
-      // Override props.
-      ...cfDistributionProps,
-      // these values can NOT be overwritten by cfDistributionProps
-      domainNames: this.buildDistributionDomainNames(),
-      certificate: this.certificate,
-      defaultBehavior: this.buildDefaultBehaviorForRegional(cachePolicy),
-      additionalBehaviors: {
-        ...(cfDistributionProps.additionalBehaviors || {}),
-      },
-    });
+  protected getImportedCloudFrontDistribution(
+    distribution: IDistribution | SsrCdkDistributionProps | undefined
+  ): Distribution | undefined {
+    return distribution !== undefined && isCDKConstruct(distribution)
+      ? (distribution as Distribution)
+      : undefined;
   }
 
-  protected createCloudFrontDistributionForEdge(): Distribution {
+  protected createCloudFrontDistribution(): Distribution {
     const { cdk } = this.props;
-    const cfDistributionProps = cdk?.distribution || {};
-    const cachePolicy = cdk?.serverCachePolicy ?? this.buildServerCachePolicy();
+    const s3Origin = new S3Origin(this.bucket);
+    const importedDistribution = this.getImportedCloudFrontDistribution(
+      cdk?.distribution
+    );
+    if (importedDistribution) return importedDistribution;
+
+    const cachePolicy = this.buildServerCachePolicy();
+    const cfDistributionProps = (cdk?.distribution ||
+      {}) as SsrCdkDistributionProps;
 
     return new Distribution(this, "Distribution", {
       // these values can be overwritten by cfDistributionProps
@@ -1011,10 +1014,8 @@ function handler(event) {
       // these values can NOT be overwritten by cfDistributionProps
       domainNames: this.buildDistributionDomainNames(),
       certificate: this.certificate,
-      defaultBehavior: this.buildDefaultBehaviorForEdge(cachePolicy),
-      additionalBehaviors: {
-        ...(cfDistributionProps.additionalBehaviors || {}),
-      },
+      defaultBehavior: this.buildDefaultBehavior(cachePolicy),
+      ...(cfDistributionProps.additionalBehaviors || {}),
     });
   }
 
@@ -1038,44 +1039,25 @@ function handler(event) {
     return domainNames;
   }
 
-  protected buildDefaultBehaviorForRegional(
-    cachePolicy: ICachePolicy
-  ): BehaviorOptions {
-    const { timeout, cdk } = this.props;
-    const cfDistributionProps = cdk?.distribution || {};
+  protected buildDefaultBehavior(cachePolicy: ICachePolicy): BehaviorOptions {
+    const { edge, timeout, cdk } = this.props;
+    const cfDistributionProps = (cdk?.distribution ||
+      {}) as SsrCdkDistributionProps;
 
-    const fnUrl = this.serverLambdaForRegional!.addFunctionUrl({
-      authType: FunctionUrlAuthType.NONE,
-    });
-
-    return {
-      viewerProtocolPolicy: ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
-      origin: new HttpOrigin(Fn.parseDomainName(fnUrl.url), {
+    let origin: S3Origin | HttpOrigin;
+    if (edge) {
+      origin = new S3Origin(this.bucket);
+    } else {
+      const fnUrl = this.serverLambdaForRegional!.addFunctionUrl({
+        authType: FunctionUrlAuthType.NONE,
+      });
+      origin = new HttpOrigin(Fn.parseDomainName(fnUrl.url), {
         readTimeout:
           typeof timeout === "string"
             ? toCdkDuration(timeout)
             : CdkDuration.seconds(timeout),
-      }),
-      allowedMethods: AllowedMethods.ALLOW_ALL,
-      cachedMethods: CachedMethods.CACHE_GET_HEAD_OPTIONS,
-      compress: true,
-      cachePolicy,
-      responseHeadersPolicy: cdk?.responseHeadersPolicy,
-      originRequestPolicy: this.buildServerOriginRequestPolicy(),
-      ...(cfDistributionProps.defaultBehavior || {}),
-      functionAssociations: [
-        ...this.buildBehaviorFunctionAssociations(),
-        ...(cfDistributionProps.defaultBehavior?.functionAssociations || []),
-      ],
-    };
-  }
-
-  protected buildDefaultBehaviorForEdge(
-    cachePolicy: ICachePolicy
-  ): BehaviorOptions {
-    const { cdk } = this.props;
-    const cfDistributionProps = cdk?.distribution || {};
-
+      });
+    }
     return {
       viewerProtocolPolicy: ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
       origin: this.s3Origin,
@@ -1090,14 +1072,16 @@ function handler(event) {
         ...this.buildBehaviorFunctionAssociations(),
         ...(cfDistributionProps.defaultBehavior?.functionAssociations || []),
       ],
-      edgeLambdas: [
-        {
-          includeBody: true,
-          eventType: LambdaEdgeEventType.ORIGIN_REQUEST,
-          functionVersion: this.serverLambdaForEdge!.currentVersion,
-        },
-        ...(cfDistributionProps.defaultBehavior?.edgeLambdas || []),
-      ],
+      edgeLambdas: edge
+        ? [
+            {
+              includeBody: true,
+              eventType: LambdaEdgeEventType.ORIGIN_REQUEST,
+              functionVersion: this.serverLambdaForEdge!.currentVersion,
+            },
+            ...(cfDistributionProps.defaultBehavior?.edgeLambdas || []),
+          ]
+        : undefined,
     };
   }
 
@@ -1131,14 +1115,43 @@ function handler(event) {
     }
   }
 
-  protected buildServerCachePolicy(allowedHeaders?: string[]) {
+  protected buildServerCachePolicy({
+    cookies,
+    headers,
+    query,
+  }: {
+    cookies?: string[];
+    headers?: string[];
+    query?: string[];
+  } = {}): ICachePolicy {
+    const { cdk } = this.props;
+
+    if (isCDKConstruct(cdk?.serverCachePolicy)) {
+      return cdk?.serverCachePolicy as ICachePolicy;
+    }
+    const ssrCachePolicyProps = cdk?.serverCachePolicy as SsrCachePolicyProps;
+    const queryProps = ssrCachePolicyProps.query || [];
+    const headersProps = ssrCachePolicyProps.headers || [];
+    const cookieProps = ssrCachePolicyProps.cookies || [];
     return new CachePolicy(this, "ServerCache", {
-      queryStringBehavior: CacheQueryStringBehavior.all(),
+      queryStringBehavior:
+        query && query.length > 0
+          ? CacheQueryStringBehavior.allowList(
+              ...new Set([...query, ...queryProps])
+            )
+          : CacheQueryStringBehavior.all(),
       headerBehavior:
-        allowedHeaders && allowedHeaders.length > 0
-          ? CacheHeaderBehavior.allowList(...allowedHeaders)
+        headers && headers.length > 0
+          ? CacheHeaderBehavior.allowList(
+              ...new Set([...headers, ...headersProps])
+            )
           : CacheHeaderBehavior.none(),
-      cookieBehavior: CacheCookieBehavior.none(),
+      cookieBehavior:
+        cookies && cookies.length > 0
+          ? CacheCookieBehavior.allowList(
+              ...new Set([...cookies, ...cookieProps])
+            )
+          : CacheCookieBehavior.none(),
       defaultTtl: CdkDuration.days(0),
       maxTtl: CdkDuration.days(365),
       minTtl: CdkDuration.days(0),

@@ -35,7 +35,7 @@ import { SqsEventSource } from "aws-cdk-lib/aws-lambda-event-sources";
 import { Stack } from "./Stack.js";
 import { SsrFunction } from "./SsrFunction.js";
 import { EdgeFunction } from "./EdgeFunction.js";
-import { SsrSite, SsrSiteProps } from "./SsrSite.js";
+import { SsrSite, SsrSiteProps, SsrCdkDistributionProps } from "./SsrSite.js";
 import { Size, toCdkSize } from "./util/size.js";
 
 export interface NextjsSiteProps extends Omit<SsrSiteProps, "nodejs"> {
@@ -291,7 +291,7 @@ export class NextjsSite extends SsrSite {
     resource.node.addDependency(policy);
   }
 
-  protected createCloudFrontDistributionForRegional(): Distribution {
+  protected createCloudFrontDistribution(): Distribution {
     /**
      * Next.js requests
      *
@@ -343,64 +343,51 @@ export class NextjsSite extends SsrSite {
      */
 
     const { cdk } = this.props;
-    const cfDistributionProps = cdk?.distribution || {};
-    const cachePolicy =
-      cdk?.serverCachePolicy ??
-      this.buildServerCachePolicy([
+    const cfDistributionProps =
+      cdk?.distribution || ({} as SsrCdkDistributionProps);
+
+    const cachePolicy = this.buildServerCachePolicy({
+      headers: [
         "accept",
         "rsc",
         "next-router-prefetch",
         "next-router-state-tree",
-      ]);
-    const serverBehavior = this.buildDefaultBehaviorForRegional(cachePolicy);
-
-    return new Distribution(this, "Distribution", {
-      // these values can be overwritten by cfDistributionProps
-      defaultRootObject: "",
-      // Override props.
-      ...cfDistributionProps,
-      // these values can NOT be overwritten by cfDistributionProps
-      domainNames: this.buildDistributionDomainNames(),
-      certificate: this.cdk!.certificate,
-      defaultBehavior: serverBehavior,
-      additionalBehaviors: {
-        "api/*": serverBehavior,
-        "_next/data/*": serverBehavior,
-        "_next/image*": this.buildImageBehavior(cachePolicy),
-        ...(cfDistributionProps.additionalBehaviors || {}),
-      },
+      ],
     });
-  }
+    const serverBehavior = this.buildDefaultBehavior(cachePolicy);
+    let distribution = this.getImportedCloudFrontDistribution(
+      cdk?.distribution
+    );
 
-  protected createCloudFrontDistributionForEdge(): Distribution {
-    const { cdk } = this.props;
-    const cfDistributionProps = cdk?.distribution || {};
-    const cachePolicy =
-      cdk?.serverCachePolicy ??
-      this.buildServerCachePolicy([
-        "accept",
-        "rsc",
-        "next-router-prefetch",
-        "next-router-state-tree",
-      ]);
-    const serverBehavior = this.buildDefaultBehaviorForEdge(cachePolicy);
+    if (!distribution) {
+      distribution = new Distribution(this, "Distribution", {
+        // these values can be overwritten by cfDistributionProps
+        defaultRootObject: "",
+        // Override props.
+        ...cfDistributionProps,
+        // these values can NOT be overwritten by cfDistributionProps
+        domainNames: this.buildDistributionDomainNames(),
+        certificate: this.cdk!.certificate,
+        defaultBehavior: serverBehavior,
+      });
+    }
 
-    return new Distribution(this, "Distribution", {
-      // these values can be overwritten by cfDistributionProps
-      defaultRootObject: "",
-      // Override props.
-      ...cfDistributionProps,
-      // these values can NOT be overwritten by cfDistributionProps
-      domainNames: this.buildDistributionDomainNames(),
-      certificate: this.cdk!.certificate,
-      defaultBehavior: serverBehavior,
-      additionalBehaviors: {
-        "api/*": serverBehavior,
-        "_next/data/*": serverBehavior,
-        "_next/image*": this.buildImageBehavior(cachePolicy),
-        ...(cfDistributionProps.additionalBehaviors || {}),
-      },
+    const behaviors: { [key: string]: BehaviorOptions } = {
+      "api/*": serverBehavior,
+      "_next/data/*": serverBehavior,
+      "_next/image*": this.buildImageBehavior(cachePolicy),
+      ...((cfDistributionProps as SsrCdkDistributionProps)
+        .additionalBehaviors || {}),
+    };
+
+    Object.keys(behaviors).forEach((behavior) => {
+      distribution!.addBehavior(
+        behavior,
+        behaviors[behavior].origin,
+        behaviors[behavior]
+      );
     });
+    return distribution;
   }
 
   private buildImageBehavior(cachePolicy: ICachePolicy): BehaviorOptions {
