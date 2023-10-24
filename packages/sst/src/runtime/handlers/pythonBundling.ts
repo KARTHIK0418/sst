@@ -85,13 +85,15 @@ export interface BundlingOptions {
   readonly assetHash?: string;
 
   readonly installCommands?: string[];
+
+  readonly exclude?: string[];
 }
 
 /**
  * Produce bundled Lambda asset code
  */
 export function bundle(options: BundlingOptions & { out: string }) {
-  const { entry, runtime, architecture, outputPathSuffix, installCommands } = options;
+  const { entry, exclude, runtime, architecture, outputPathSuffix, installCommands } = options;
 
   const stagedir = FileSystem.mkdtemp("python-bundling-");
   const hasDeps = stageDependencies(entry, stagedir);
@@ -134,9 +136,7 @@ export function bundle(options: BundlingOptions & { out: string }) {
   }
 
   // Copy source code to the bundle.
-  fs.cpSync(entry, outputPath, {
-    recursive: true,
-  });
+  copyWithExclusions(entry, outputPath, exclude);
 }
 
 /**
@@ -172,4 +172,39 @@ function stageInstallCommands(
   }
 
   return found;
+}
+
+// Allows for copying source files even if source is parent directory (must exclude '.sst/' in such case).
+function copyWithExclusions(source: string, destination: string, excludes: string[] = []) {
+  // Create destination directory if it doesn't exist
+  if (!fs.existsSync(destination)) {
+    fs.mkdirSync(destination, { recursive: true });
+  }
+
+  // Get list of files and directories in source directory
+  const files = fs.readdirSync(source);
+
+  // Loop through files and directories
+  for (const file of files) {
+    // Check if file or directory is excluded
+    if (excludes.includes(file)) {
+      continue;
+    }
+
+    // Get full paths of source and destination files/directories
+    const sourcePath = path.join(source, file);
+    const destPath = path.join(destination, file);
+
+    // Get stats of source file/directory
+    const stats = fs.statSync(sourcePath);
+
+    // If source is a directory, recursively copy it
+    if (stats.isDirectory()) {
+      copyWithExclusions(sourcePath, destPath, excludes);
+    }
+    // If source is a file, copy it
+    else {
+      fs.copyFileSync(sourcePath, destPath);
+    }
+  }
 }
