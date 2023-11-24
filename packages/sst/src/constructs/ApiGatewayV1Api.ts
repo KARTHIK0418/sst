@@ -800,6 +800,7 @@ export class ApiGatewayV1Api<
   public getFunctionBinding(): FunctionBindingProps {
     return {
       clientPackage: "api",
+      resourceType: 'ApiGatewayV1Api',
       variables: {
         url: {
           type: "plain",

@@ -1150,6 +1150,7 @@ export class Function extends CDKFunction implements SSTConstruct {
   public getFunctionBinding(): FunctionBindingProps {
     return {
       clientPackage: "function",
+      resourceType: "Function",
       variables: {
         functionName: {
           type: "plain",
