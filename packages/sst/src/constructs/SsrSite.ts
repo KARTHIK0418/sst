@@ -69,7 +69,7 @@ import { LambdaFunction } from "aws-cdk-lib/aws-events-targets";
 
 import { App } from "./App.js";
 import { Stack } from "./Stack.js";
-import { Distribution, DistributionDomainProps } from "./Distribution.js";
+import { Distribution, DistributionDomainProps, DistributionProps } from "./Distribution.js";
 import { Logger } from "../logger.js";
 import { createAppContext } from "./context.js";
 import { SSTConstruct, isCDKConstruct } from "./Construct.js";
@@ -580,7 +580,7 @@ export abstract class SsrSite extends Construct implements SSTConstruct {
     let singletonOriginRequestPolicy: IOriginRequestPolicy;
 
     // Create Bucket
-    const bucket = createS3Bucket();
+    const bucket = self.createS3Bucket();
 
     // Build app
     buildApp();
@@ -690,23 +690,6 @@ export abstract class SsrSite extends Construct implements SSTConstruct {
       }
     }
 
-    function createS3Bucket() {
-      // cdk.bucket is an imported construct
-      if (cdk?.bucket && isCDKConstruct(cdk?.bucket)) {
-        return cdk.bucket as Bucket;
-      }
-
-      // cdk.bucket is a prop
-      return new Bucket(self, "S3Bucket", {
-        publicReadAccess: false,
-        blockPublicAccess: BlockPublicAccess.BLOCK_ALL,
-        autoDeleteObjects: true,
-        removalPolicy: RemovalPolicy.DESTROY,
-        enforceSSL: true,
-        ...cdk?.bucket,
-      });
-    }
-
     function createServerFunctionForDev() {
       const role = new Role(self, "ServerFunctionRole", {
         assumedBy: new CompositePrincipal(
@@ -716,7 +699,7 @@ export abstract class SsrSite extends Construct implements SSTConstruct {
         maxSessionDuration: CdkDuration.hours(12),
       });
 
-      return new SsrFunction(self, `ServerFunction`, {
+      return self.createSsrFunction(`ServerFunction`, {
         description: "Server handler placeholder",
         bundle: path.join(__dirname, "../support/ssr-site-function-stub"),
         handler: "index.handler",
@@ -746,7 +729,7 @@ export abstract class SsrSite extends Construct implements SSTConstruct {
       if (ssrFunctions.length === 0) return;
 
       // Create warmer function
-      const warmer = new CdkFunction(self, "WarmerFunction", {
+      const warmer = self.createFunction("WarmerFunction", {
         description: "SSR warmer",
         code: Code.fromAsset(
           plan.warmerConfig?.function ??
@@ -793,7 +776,7 @@ export abstract class SsrSite extends Construct implements SSTConstruct {
     }
 
     function createCloudFrontDistribution() {
-      const distribution = new Distribution(self, "CDN", {
+      const distribution = self.createDistribution("CDN", {
         scopeOverride: self,
         customDomain,
         cdk: {
@@ -992,7 +975,7 @@ function handler(event) {
     }
 
     function createFunctionOrigin(props: FunctionOriginConfig) {
-      const fn = new SsrFunction(self, props.constructId, {
+      const fn = self.createSsrFunction(props.constructId, {
         runtime,
         timeout,
         memorySize,
@@ -1060,7 +1043,7 @@ function handler(event) {
     function createImageOptimizationFunctionOrigin(
       props: ImageOptimizationFunctionOriginConfig
     ) {
-      const fn = new CdkFunction(self, `ImageFunction`, {
+      const fn = self.createFunction(`ImageFunction`, {
         currentVersionOptions: {
           removalPolicy: RemovalPolicy.DESTROY,
         },
@@ -1590,6 +1573,45 @@ if (event.type === "warmer") {
     };
   }) {
     return input;
+  }
+
+
+  /////////////////////
+  // Factory methods
+  /////////////////////
+
+  protected createFunction(id: string, props: CdkFunctionProps): CdkFunction {
+    return new CdkFunction(this, id, props)
+  }
+
+  protected createSsrFunction(id: string, props: SsrFunctionProps): SsrFunction {
+    return new SsrFunction(this, id, props);
+  }
+
+  /**
+   *  `domainNames`, `certificate`, `defaultBehavior` and `additionalBehaviors` should NOT be overwritten
+   */
+  protected createDistribution(id: string, props: DistributionProps): Distribution {
+    return new Distribution(this, id, props)
+  }
+
+  protected createS3Bucket(): Bucket {
+    const { cdk } = this.props;
+
+    // cdk.bucket is an imported construct
+    if (cdk?.bucket && isCDKConstruct(cdk?.bucket)) {
+      return cdk.bucket as Bucket;
+    }
+
+    // cdk.bucket is a prop
+    return new Bucket(this, "S3Bucket", {
+      publicReadAccess: false,
+      blockPublicAccess: BlockPublicAccess.BLOCK_ALL,
+      autoDeleteObjects: true,
+      removalPolicy: RemovalPolicy.DESTROY,
+      enforceSSL: true,
+      ...cdk?.bucket,
+    });
   }
 }
 
